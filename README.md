@@ -13,7 +13,11 @@ We have built a minimalist Platform-as-a-Service (PaaS) that runs on a single Li
     ```bash
     npm install
     ```
-2.  **Infrastructure**:
+2.  **Build Builder Image**:
+    ```bash
+    docker build -t local-nixpacks-builder builder/
+    ```
+3.  **Infrastructure**:
     ```bash
     docker network create paas-network
     docker-compose up -d
