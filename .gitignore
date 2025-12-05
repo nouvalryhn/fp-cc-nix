@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+temp_builds
+server.log
+.env
+.DS_Store
+coverage
+.nyc_output
+paas.db
+paas.db-journal
+test-repo
