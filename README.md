@@ -66,3 +66,9 @@ curl -H "Host: my-app.localhost" http://localhost
     -   **Dashboard**: Lists running apps with status.
     -   **Deploy**: Form to deploy new apps from Git URLs.
 -   **Verification**: Verified page load and API connectivity.
+
+### Verified Stacks
+-   **Node.js**: `railwayapp-templates/node-express` (Port 3000)
+-   **Go**: `railwayapp-templates/gin` (Port 3000)
+    -   *Note*: Nixpacks automatically detected Go and built the binary.
+-   **Next.js**: `railwayapp-templates/nextjs-basic` (Port 3000)
