@@ -7,7 +7,7 @@
     id: string;
     name: string;
     status: string;
-    url: string;
+    domain: string;
   }
 
   let apps: App[] = [];
@@ -37,6 +37,7 @@
       if (!res.ok) throw new Error("Failed to fetch apps");
       apps = await res.json();
       error = null;
+      console.log("Fetched apps:", apps);
     } catch (e: any) {
       error = e.message;
     } finally {
@@ -100,7 +101,7 @@
               </div>
             </div>
             <a
-              href={app.url}
+              href={`http://${app.domain}`}
               target="_blank"
               class="btn"
               style="background: var(--bg-body);"
@@ -109,7 +110,7 @@
             </a>
           </div>
           <div class="text-sm text-muted break-all">
-            {app.url}
+            {app.domain}
           </div>
         </div>
       {/each}
