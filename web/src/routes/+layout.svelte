@@ -1,15 +1,41 @@
 <script lang="ts">
-  import '../app.css';
+  import "../app.css";
+  import { auth, logout } from "../stores/auth";
+
+  let isAuthenticated = false;
+  let isAdmin = false;
+
+  auth.subscribe((val) => {
+    isAuthenticated = val.isAuthenticated;
+    isAdmin = val.user?.role === "ADMIN";
+  });
 </script>
 
 <nav class="border-b bg-white">
-  <div class="container py-4 flex justify-between items-center" style="padding-top: 1rem; padding-bottom: 1rem;">
-    <a href="/" class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600" style="background: linear-gradient(to right, #2563eb, #4f46e5); -webkit-background-clip: text; color: transparent;">
+  <div
+    class="container py-4 flex justify-between items-center"
+    style="padding-top: 1rem; padding-bottom: 1rem;"
+  >
+    <a
+      href="/"
+      class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600"
+      style="background: linear-gradient(to right, #2563eb, #4f46e5); -webkit-background-clip: text; color: transparent;"
+    >
       PaaS Dashboard
     </a>
-    <a href="/deploy" class="btn btn-primary">
-      + New Deployment
-    </a>
+
+    <div class="flex items-center gap-4">
+      {#if isAuthenticated}
+        {#if isAdmin}
+          <a href="/admin" class="btn">Superadmin</a>
+        {/if}
+        <a href="/deploy" class="btn btn-primary"> + New Deployment </a>
+        <button on:click={logout} class="btn">Logout</button>
+      {:else}
+        <a href="/login" class="btn">Login</a>
+        <a href="/register" class="btn btn-primary">Register</a>
+      {/if}
+    </div>
   </div>
 </nav>
 
@@ -38,5 +64,8 @@
   }
   .font-bold {
     font-weight: 700;
+  }
+  .gap-4 {
+    gap: 1rem;
   }
 </style>

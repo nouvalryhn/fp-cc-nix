@@ -18,9 +18,12 @@ export async function deployApp(appName: string, imageName: string, env: Record<
 
     // Format env for Docker
     const envArr = Object.entries(env).map(([k, v]) => `${k}=${v}`);
-    // Enforce PORT=3000 for Traefik compatibility
+    // Enforce PORT=3000 and HOST=0.0.0.0 for Traefik compatibility
     if (!env['PORT']) {
         envArr.push('PORT=3000');
+    }
+    if (!env['HOST']) {
+        envArr.push('HOST=0.0.0.0');
     }
 
     // We connect it to a specific network so Traefik can find it? 

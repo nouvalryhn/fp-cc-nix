@@ -10,3 +10,5 @@ coverage
 paas.db
 paas.db-journal
 test-repo
+
+/src/generated/prisma

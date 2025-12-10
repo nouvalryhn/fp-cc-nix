@@ -16,6 +16,24 @@ services:
     networks:
       - paas-network
 
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: paas
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - paas-network
+
+volumes:
+  pgdata:
+
+
 networks:
   paas-network:
     external: true

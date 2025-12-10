@@ -25,8 +25,10 @@ export async function buildImage(repoUrl: string, appName: string): Promise<stri
             '--rm',
             '-v', `${repoDir}:/app`,
             '-v', '/var/run/docker.sock:/var/run/docker.sock',
+            '-e', 'NIXPACKS_NODE_VERSION=20',
             'local-nixpacks-builder:latest',
             '/usr/local/bin/nixpacks', 'build', '/app',
+            '--env', 'NIXPACKS_NODE_VERSION=20',
             '--name', imageName
         ];
 

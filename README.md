@@ -18,9 +18,15 @@ We have built a minimalist Platform-as-a-Service (PaaS) that runs on a single Li
     docker build -t local-nixpacks-builder builder/
     ```
 3.  **Infrastructure**:
+    Start Traefik (proxy) and PostgreSQL (database):
     ```bash
     docker network create paas-network
     docker-compose up -d
+    ```
+4.  **Database Setup**:
+    Run Prisma migrations to initialize the schema:
+    ```bash
+    npx prisma migrate dev
     ```
 
 ## Usage
@@ -66,6 +72,11 @@ curl -H "Host: my-app.localhost" http://localhost
     -   **Dashboard**: Lists running apps with status.
     -   **Deploy**: Form to deploy new apps from Git URLs.
 -   **Verification**: Verified page load and API connectivity.
+
+## V2 Features (Auth & DB)
+-   **Database**: PostgreSQL (Prisma ORM)
+-   **Auth**: JWT-based Email/Password
+-   **Roles**: User and Superadmin
 
 ### Verified Stacks
 -   **Node.js**: `railwayapp-templates/node-express` (Port 3000)
