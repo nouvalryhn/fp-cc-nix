@@ -7,7 +7,7 @@
         id: string;
         name: string;
         status: string;
-        url: string;
+        domain: string;
         user: { email: string };
     }
 
@@ -98,7 +98,7 @@
                             </td>
                             <td class="p-4">
                                 <a
-                                    href={app.url}
+                                    href={`http://${app.domain}`}
                                     target="_blank"
                                     class="text-blue-600 hover:underline mr-4"
                                     >View</a
