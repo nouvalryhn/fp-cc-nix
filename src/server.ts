@@ -111,6 +111,54 @@ fastify.delete('/apps/:id', { preHandler: [fastify.authenticate] }, async (reque
     return { status: 'deleted' };
 });
 
+fastify.get('/apps/:id/metrics', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const app = await prisma.app.findUnique({ where: { id } });
+    
+    if (!app) return reply.code(404).send({ error: 'App not found' });
+    
+    if (app.userId !== request.user.id && request.user.role !== 'ADMIN') {
+        return reply.code(403).send({ error: 'Forbidden' });
+    }
+
+    try {
+        const container = docker.getContainer(app.name);
+        const stats = await container.stats({ stream: false });
+        
+        const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+        const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+        const cpuPercent = (cpuDelta / systemDelta) * stats.cpu_stats.online_cpus * 100;
+
+        const memoryUsage = stats.memory_stats.usage / 1024 / 1024; // MB
+        const memoryLimit = stats.memory_stats.limit / 1024 / 1024; // MB
+        const memoryPercent = (stats.memory_stats.usage / stats.memory_stats.limit) * 100;
+
+        const networks = stats.networks || {};
+        let rxBytes = 0, txBytes = 0;
+        Object.values(networks).forEach((net: any) => {
+            rxBytes += net.rx_bytes;
+            txBytes += net.tx_bytes;
+        });
+
+        return {
+            cpu: {
+                percent: cpuPercent.toFixed(2),
+            },
+            memory: {
+                usage: memoryUsage.toFixed(2),
+                limit: memoryLimit.toFixed(2),
+                percent: memoryPercent.toFixed(2),
+            },
+            network: {
+                rxBytes,
+                txBytes,
+            },
+        };
+    } catch (e: any) {
+        return reply.code(500).send({ error: 'Failed to fetch metrics', message: e.message });
+    }
+});
+
 const start = async () => {
     try {
         await fastify.listen({ port: 3000, host: '0.0.0.0' });
