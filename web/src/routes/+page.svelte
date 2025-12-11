@@ -10,7 +10,14 @@
     domain: string;
   }
 
+  interface Metrics {
+    cpu: { percent: string };
+    memory: { usage: string; limit: string; percent: string };
+    network: { rxBytes: number; txBytes: number };
+  }
+
   let apps: App[] = [];
+  let metrics: Record<string, Metrics> = {};
   let loading = true;
   let error: string | null = null;
   let token: string | null = null;
@@ -36,6 +43,8 @@
       }
       if (!res.ok) throw new Error("Failed to fetch apps");
       apps = await res.json();
+      
+      await fetchAllMetrics();
       error = null;
       console.log("Fetched apps:", apps);
     } catch (e: any) {
@@ -43,6 +52,24 @@
     } finally {
       loading = false;
     }
+  }
+
+  async function fetchAllMetrics() {
+    for (const app of apps) {
+      if (app.status === 'running') {
+        try {
+          const res = await fetch(`http://localhost:3000/apps/${app.id}/metrics`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            metrics[app.id] = await res.json();
+          }
+        } catch (e) {
+          console.error(`Failed to fetch metrics for ${app.name}`);
+        }
+      }
+    }
+    metrics = { ...metrics };
   }
 
   onMount(() => {
@@ -64,6 +91,14 @@
       clearInterval(interval);
     };
   });
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
 </script>
 
 <div class="space-y-6">
@@ -109,9 +144,32 @@
               Open ↗
             </a>
           </div>
-          <div class="text-sm text-muted break-all">
+          
+          <div class="text-sm text-muted break-all mb-4">
             {app.domain}
           </div>
+
+          {#if metrics[app.id] && app.status === 'running'}
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-label">CPU</div>
+                <div class="metric-value">{metrics[app.id].cpu.percent}%</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Memory</div>
+                <div class="metric-value">{metrics[app.id].memory.percent}%</div>
+                <div class="metric-sub">{metrics[app.id].memory.usage} / {metrics[app.id].memory.limit} MB</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Network In</div>
+                <div class="metric-value">{formatBytes(metrics[app.id].network.rxBytes)}</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Network Out</div>
+                <div class="metric-value">{formatBytes(metrics[app.id].network.txBytes)}</div>
+              </div>
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -173,5 +231,40 @@
   .status-badge.running {
     background: #dcfce7;
     color: #166534;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .metric-card {
+    padding: 0.75rem;
+    background: var(--bg-body);
+    border-radius: 0.5rem;
+  }
+
+  .metric-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+
+  .metric-sub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
   }
 </style>
