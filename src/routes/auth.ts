@@ -1,53 +1,72 @@
-import { FastifyInstance } from 'fastify';
-import { z } from 'zod';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { prisma } from '../db/client';
+import { FastifyInstance } from "fastify";
+import { z } from "zod";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { prisma } from "../db/client";
 
 const RegisterSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
+  email: z.email({ message: "Email format is invalid" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" }),
 });
 
 const LoginSchema = z.object({
-    email: z.string().email(),
-    password: z.string(),
+  email: z.email({ message: "Email format is invalid" }),
+  password: z.string(),
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
+const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 export async function authRoutes(fastify: FastifyInstance) {
-    fastify.post('/auth/register', async (request, reply) => {
-        const { email, password } = RegisterSchema.parse(request.body);
+  fastify.post("/auth/register", async (request, reply) => {
+    const res = RegisterSchema.safeParse(request.body);
+    if (!res.success) {
+      return reply.status(404).send({ error: res.error.issues[0].message });
+    }
 
-        const existing = await prisma.user.findUnique({ where: { email } });
-        if (existing) {
-            return reply.status(400).send({ error: 'User already exists' });
-        }
+    const { email, password } = res.data;
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return reply.status(400).send({ error: "User already exists" });
+    }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await prisma.user.create({
-            data: { email, password: hashedPassword },
-        });
-
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-        return { token, user: { id: user.id, email: user.email, role: user.role } };
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { email, password: hashedPassword },
     });
 
-    fastify.post('/auth/login', async (request, reply) => {
-        const { email, password } = LoginSchema.parse(request.body);
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" },
+    );
+    return { token, user: { id: user.id, email: user.email, role: user.role } };
+  });
 
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-            return reply.status(401).send({ error: 'Invalid credentials' });
-        }
+  fastify.post("/auth/login", async (request, reply) => {
+    const res = LoginSchema.safeParse(request.body);
+    if (!res.success) {
+      return reply.status(404).send({ error: res.error.issues[0].message });
+    }
 
-        const valid = await bcrypt.compare(password, user.password);
-        if (!valid) {
-            return reply.status(401).send({ error: 'Invalid credentials' });
-        }
+    const { email, password } = res.data;
 
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-        return { token, user: { id: user.id, email: user.email, role: user.role } };
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return reply.status(401).send({ error: "Invalid credentials" });
+    }
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      return reply.status(401).send({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" },
+    );
+    return { token, user: { id: user.id, email: user.email, role: user.role } };
+  });
 }
