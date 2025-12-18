@@ -1,5 +1,8 @@
-import Docker from 'dockerode';
+import Docker from "dockerode";
 
-const docker = new Docker({ socketPath: '//./pipe/docker_engine' });
+const docker =
+  process.platform === "linux"
+    ? new Docker({ socketPath: "/var/run/docker.sock" })
+    : new Docker({ socketPath: "//./pipe/docker_engine" });
 
 export default docker;
