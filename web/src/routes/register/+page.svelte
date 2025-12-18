@@ -1,36 +1,36 @@
 <script lang="ts">
-    import { auth } from "../../stores/auth";
-    import { goto } from "$app/navigation";
+import { auth } from "../../stores/auth";
+import { goto } from "$app/navigation";
 
-    let email = "";
-    let password = "";
-    let error = "";
-    let loading = false;
+let email = "";
+let password = "";
+let error = "";
+let loading = false;
 
-    async function register() {
-        loading = true;
-        error = "";
-        try {
-            const res = await fetch("http://localhost:3000/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Registration failed");
+async function register() {
+  loading = true;
+  error = "";
+  try {
+    const res = await fetch("http://localhost:3000/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Registration failed");
 
-            auth.set({
-                token: data.token,
-                user: data.user,
-                isAuthenticated: true,
-            });
-            goto("/");
-        } catch (e: any) {
-            error = e.message;
-        } finally {
-            loading = false;
-        }
-    }
+    auth.set({
+      token: data.token,
+      user: data.user,
+      isAuthenticated: true,
+    });
+    goto("/");
+  } catch (e: any) {
+    error = e.message;
+  } finally {
+    loading = false;
+  }
+}
 </script>
 
 <div class="container">

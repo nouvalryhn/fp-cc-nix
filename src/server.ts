@@ -12,7 +12,11 @@ import jwt from "jsonwebtoken";
 const fastify = Fastify({ logger: true });
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
-fastify.register(cors, { origin: true });
+fastify.register(cors, {
+  origin: true,
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Authorization", "Content-Type"],
+});
 fastify.register(authRoutes);
 
 fastify.decorate(
@@ -102,6 +106,48 @@ fastify.get(
       return reply.code(403).send({ error: "Forbidden" });
     const apps = await prisma.app.findMany({ include: { user: true } });
     return apps;
+  },
+);
+
+fastify.patch(
+  "/apps/:id",
+  { preHandler: [fastify.authenticate] },
+  async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const app = await prisma.app.findUnique({ where: { id } });
+
+    if (!app) return reply.code(404).send({ error: "App not found" });
+
+    if (app.userId !== request.user.id && request.user.role !== "ADMIN") {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    try {
+      const container = docker.getContainer(app.name);
+      const isRunning = app.status === "running";
+
+      if (isRunning) {
+        await container.stop();
+      } else {
+        await container.start();
+      }
+
+      await prisma.app.update({
+        data: {
+          status: isRunning ? "stopped" : "running",
+        },
+        where: {
+          id,
+        },
+      });
+      return {
+        status: isRunning
+          ? "container has stopped successfully"
+          : "container has started successfully",
+      };
+    } catch (e: any) {
+      console.log(`Failed to start/stop container: ${e} `);
+    }
   },
 );
 

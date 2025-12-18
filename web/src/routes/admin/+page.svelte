@@ -1,74 +1,70 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { auth } from "../../stores/auth";
-    import { goto } from "$app/navigation";
+import { onMount } from "svelte";
+import { auth } from "../../stores/auth";
+import { goto } from "$app/navigation";
 
-    interface App {
-        id: string;
-        name: string;
-        status: string;
-        domain: string;
-        user: { email: string };
-    }
+interface App {
+  id: string;
+  name: string;
+  status: string;
+  domain: string;
+  user: { email: string };
+}
 
-    let apps: App[] = [];
-    let loading = true;
-    let token: string | null = null;
-    let error: string | null = null;
+let apps: App[] = [];
+let loading = true;
+let token: string | null = null;
+let error: string | null = null;
 
-    async function fetchAllApps() {
-        if (!token) return;
-        try {
-            const res = await fetch("http://localhost:3000/admin/apps", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (res.status === 403 || res.status === 401) {
-                goto("/"); // fallback
-                return;
-            }
-            apps = await res.json();
-        } catch (e: any) {
-            error = e.message;
-        } finally {
-            loading = false;
-        }
-    }
-
-    async function deleteApp(id: string) {
-        if (
-            !confirm(
-                "Are you sure? This will delete the app container and record.",
-            )
-        )
-            return;
-        try {
-            await fetch(`http://localhost:3000/apps/${id}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            fetchAllApps(); // Refresh
-        } catch (e) {
-            alert("Failed to delete");
-        }
-    }
-
-    onMount(() => {
-        const unsub = auth.subscribe((val) => {
-            if (!val.isAuthenticated || val.user?.role !== "ADMIN") {
-                goto("/");
-            } else {
-                token = val.token;
-                fetchAllApps();
-            }
-        });
-        return unsub;
+async function fetchAllApps() {
+  if (!token) return;
+  try {
+    const res = await fetch("http://localhost:3000/admin/apps", {
+      headers: { Authorization: `Bearer ${token}` },
     });
+    if (res.status === 403 || res.status === 401) {
+      goto("/"); // fallback
+      return;
+    }
+    apps = await res.json();
+  } catch (e: any) {
+    error = e.message;
+  } finally {
+    loading = false;
+  }
+}
+
+async function deleteApp(id: string) {
+  if (!confirm("Are you sure? This will delete the app container and record."))
+    return;
+  try {
+    await fetch(`http://localhost:3000/apps/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchAllApps(); // Refresh
+  } catch (e) {
+    alert("Failed to delete");
+  }
+}
+
+onMount(() => {
+  const unsub = auth.subscribe((val) => {
+    if (!val.isAuthenticated || val.user?.role !== "ADMIN") {
+      goto("/");
+    } else {
+      token = val.token;
+      fetchAllApps();
+    }
+  });
+  return unsub;
+});
 </script>
 
 <div class="space-y-6">
     <header>
         <h1>Superadmin Dashboard</h1>
-        <p class="text-muted">Manage ALL applications across the system.</p>
+        <p class="text-muted">Manage All applications across the system.</p>
     </header>
 
     {#if loading}

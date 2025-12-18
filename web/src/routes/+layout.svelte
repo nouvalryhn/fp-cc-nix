@@ -1,14 +1,14 @@
 <script lang="ts">
-  import "../app.css";
-  import { auth, logout } from "../stores/auth";
+import "../app.css";
+import { auth, logout } from "../stores/auth";
 
-  let isAuthenticated = false;
-  let isAdmin = false;
+let isAuthenticated = false;
+let isAdmin = false;
 
-  auth.subscribe((val) => {
-    isAuthenticated = val.isAuthenticated;
-    isAdmin = val.user?.role === "ADMIN";
-  });
+auth.subscribe((val) => {
+  isAuthenticated = val.isAuthenticated;
+  isAdmin = val.user?.role === "ADMIN";
+});
 </script>
 
 <nav class="border-b bg-white">

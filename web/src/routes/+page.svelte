@@ -1,104 +1,133 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { auth } from "../stores/auth";
-  import { goto } from "$app/navigation";
+import { onMount } from "svelte";
+import { auth } from "../stores/auth";
+import { goto } from "$app/navigation";
 
-  interface App {
-    id: string;
-    name: string;
-    status: string;
-    domain: string;
+interface App {
+  id: string;
+  name: string;
+  status: string;
+  domain: string;
+}
+
+interface Metrics {
+  cpu: { percent: string };
+  memory: { usage: string; limit: string; percent: string };
+  network: { rxBytes: number; txBytes: number };
+}
+
+let apps: App[] = [];
+let metrics: Record<string, Metrics> = {};
+let loading = true;
+let error: string | null = null;
+let token: string | null = null;
+
+auth.subscribe((value) => {
+  token = value.token;
+  if (!value.isAuthenticated && !loading) {
+    // redirect handled in onMount or separate page guard
   }
+});
 
-  interface Metrics {
-    cpu: { percent: string };
-    memory: { usage: string; limit: string; percent: string };
-    network: { rxBytes: number; txBytes: number };
-  }
-
-  let apps: App[] = [];
-  let metrics: Record<string, Metrics> = {};
-  let loading = true;
-  let error: string | null = null;
-  let token: string | null = null;
-
-  auth.subscribe((value) => {
-    token = value.token;
-    if (!value.isAuthenticated && !loading) {
-      // redirect handled in onMount or separate page guard
-    }
-  });
-
-  async function fetchApps() {
-    if (!token) return;
-    try {
-      const res = await fetch("http://localhost:3000/apps", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (res.status === 401) {
-        goto("/login");
-        return;
-      }
-      if (!res.ok) throw new Error("Failed to fetch apps");
-      apps = await res.json();
-      
-      await fetchAllMetrics();
-      error = null;
-      console.log("Fetched apps:", apps);
-    } catch (e: any) {
-      error = e.message;
-    } finally {
-      loading = false;
-    }
-  }
-
-  async function fetchAllMetrics() {
-    for (const app of apps) {
-      if (app.status === 'running') {
-        try {
-          const res = await fetch(`http://localhost:3000/apps/${app.id}/metrics`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            metrics[app.id] = await res.json();
-          }
-        } catch (e) {
-          console.error(`Failed to fetch metrics for ${app.name}`);
-        }
-      }
-    }
-    metrics = { ...metrics };
-  }
-
-  onMount(() => {
-    const unsub = auth.subscribe((val) => {
-      if (!val.isAuthenticated) {
-        goto("/login");
-      } else {
-        token = val.token;
-        fetchApps();
-      }
+async function fetchApps() {
+  if (!token) return;
+  try {
+    const res = await fetch("http://localhost:3000/apps", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
+    if (res.status === 401) {
+      goto("/login");
+      return;
+    }
+    if (!res.ok) throw new Error("Failed to fetch apps");
+    apps = await res.json();
 
-    const interval = setInterval(() => {
-      if (token) fetchApps();
-    }, 5000);
+    await fetchAllMetrics();
+    error = null;
+    console.log("Fetched apps:", apps);
+  } catch (e: any) {
+    error = e.message;
+  } finally {
+    loading = false;
+  }
+}
 
-    return () => {
-      unsub();
-      clearInterval(interval);
-    };
+async function fetchAllMetrics() {
+  for (const app of apps) {
+    if (app.status === "running") {
+      try {
+        const res = await fetch(
+          `http://localhost:3000/apps/${app.id}/metrics`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        if (res.ok) {
+          metrics[app.id] = await res.json();
+        }
+      } catch (e) {
+        console.error(`Failed to fetch metrics for ${app.name}`);
+      }
+    }
+  }
+  metrics = { ...metrics };
+}
+
+async function changeContainerState(app: any) {
+  if (!token) return;
+
+  const isRunning = app.status === "running";
+  if (
+    !confirm(`Are you sure to ${isRunning ? "stop" : "start"} this container?`)
+  )
+    return;
+
+  try {
+    const res = await fetch(`http://localhost:3000/apps/${app.id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      method: "PATCH",
+    });
+    if (res.status === 401) {
+      goto("/login");
+      return;
+    }
+    fetchApps();
+  } catch (e) {
+    alert("Failed to change container state");
+  }
+}
+
+onMount(() => {
+  const unsub = auth.subscribe((val) => {
+    if (!val.isAuthenticated) {
+      goto("/login");
+    } else {
+      token = val.token;
+      fetchApps();
+    }
   });
 
-  function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
+  const interval = setInterval(() => {
+    if (token) fetchApps();
+  }, 5000);
+
+  return () => {
+    unsub();
+    clearInterval(interval);
+  };
+});
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
 </script>
 
 <div class="space-y-6">
@@ -135,16 +164,22 @@
                 {app.status}
               </div>
             </div>
-            <a
-              href={`http://${app.domain}`}
-              target="_blank"
-              class="btn"
-              style="background: var(--bg-body);"
-            >
-              Open ↗
-            </a>
+              <div class="p-4">
+                <button class="btn"
+                      on:click={() => changeContainerState(app)}>
+                      {app.status === "running" ? "Stop" : "Start"}
+                </button>
+
+              <a
+                href={`http://${app.domain}`}
+                target="_blank"
+                class="btn"
+                style="background: var(--bg-body);"
+              >
+                Open ↗
+              </a>
+            </div>
           </div>
-          
           <div class="text-sm text-muted break-all mb-4">
             {app.domain}
           </div>
@@ -206,13 +241,23 @@
   .text-center {
     text-align: center;
   }
+
   .py-12 {
     padding-top: 3rem;
     padding-bottom: 3rem;
   }
+
+    .p-4 {
+    padding: 1rem;
+  }
+
+
+
   .mb-4 {
     margin-bottom: 1rem;
   }
+
+
   .break-all {
     word-break: break-all;
   }
@@ -228,6 +273,7 @@
     color: #64748b;
     margin-top: 0.25rem;
   }
+
   .status-badge.running {
     background: #dcfce7;
     color: #166534;
@@ -267,4 +313,5 @@
     color: var(--text-muted);
     margin-top: 0.25rem;
   }
+
 </style>
