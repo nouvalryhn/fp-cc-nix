@@ -1,107 +1,181 @@
 <script lang="ts">
-import { auth } from "../../stores/auth";
-import { goto } from "$app/navigation";
+    import { auth } from "../../stores/auth";
+    import { goto } from "$app/navigation";
 
-let email = "";
-let password = "";
-let error = "";
-let loading = false;
+    let email = "";
+    let password = "";
+    let error = "";
+    let loading = false;
 
-async function register() {
-  loading = true;
-  error = "";
-  try {
-    const res = await fetch("http://localhost:3000/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Registration failed");
+    async function register() {
+        loading = true;
+        error = "";
+        try {
+            const res = await fetch("/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Registration failed");
 
-    auth.set({
-      token: data.token,
-      user: data.user,
-      isAuthenticated: true,
-    });
-    goto("/");
-  } catch (e: any) {
-    error = e.message;
-  } finally {
-    loading = false;
-  }
-}
+            auth.set({
+                token: data.token,
+                user: data.user,
+                isAuthenticated: true,
+            });
+            goto("/");
+        } catch (e: any) {
+            error = e.message;
+        } finally {
+            loading = false;
+        }
+    }
 </script>
 
-<div class="container">
-    <div class="card login-card">
-        <h1 class="text-2xl font-bold mb-6 text-center">Register</h1>
+<div class="auth-container animate-fade-in">
+    <div class="auth-card">
+        <div class="card-header">
+            <h1 class="auth-title">Create Account</h1>
+            <p class="auth-subtitle">Join us and start deploying</p>
+        </div>
 
         {#if error}
-            <div class="alert error">{error}</div>
+            <div class="error-banner animate-fade-in">{error}</div>
         {/if}
 
-        <form on:submit|preventDefault={register} class="space-y-4">
-            <div>
-                <label for="email">Email</label>
-                <input type="email" id="email" bind:value={email} required />
+        <form on:submit|preventDefault={register} class="auth-form">
+            <div class="form-group">
+                <label for="email" class="label">Email Address</label>
+                <input
+                    type="email"
+                    id="email"
+                    class="input"
+                    placeholder="name@example.com"
+                    bind:value={email}
+                    required
+                />
             </div>
-            <div>
-                <label for="password">Password</label>
+
+            <div class="form-group">
+                <label for="password" class="label">Password</label>
                 <input
                     type="password"
                     id="password"
+                    class="input"
+                    placeholder="••••••••"
                     bind:value={password}
                     required
                 />
             </div>
+
             <button
                 type="submit"
-                class="btn btn-primary w-full"
+                class="btn btn-primary btn-block btn-lg mt-2"
                 disabled={loading}
             >
-                {loading ? "Creating Account..." : "Register"}
+                {#if loading}
+                    <span class="loader-sm"></span> Creating Account...
+                {:else}
+                    Sign Up
+                {/if}
             </button>
         </form>
 
-        <div class="mt-4 text-center">
-            <a href="/login" class="text-primary hover:underline"
-                >Already have an account? Login</a
-            >
+        <div class="auth-footer">
+            <p>Already have an account?</p>
+            <a href="/login" class="link-primary">Sign In</a>
         </div>
     </div>
 </div>
 
 <style>
-    .container {
+    .auth-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        min-height: 80vh;
-    }
-    .login-card {
-        width: 100%;
-        max-width: 400px;
+        min-height: calc(100vh - 140px);
         padding: 2rem;
     }
-    .alert.error {
-        background: #fee2e2;
-        color: #991b1b;
-        padding: 0.75rem;
-        border-radius: 4px;
-        margin-bottom: 1rem;
-        font-size: 0.875rem;
-    }
-    .w-full {
+
+    .auth-card {
         width: 100%;
+        max-width: 400px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 2.5rem;
+        box-shadow: var(--shadow-lg);
     }
-    .text-center {
+
+    .card-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .auth-title {
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .auth-subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
+
+    .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .error-banner {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+        padding: 0.75rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
         text-align: center;
     }
-    .mt-4 {
-        margin-top: 1rem;
+
+    .btn-block {
+        width: 100%;
+        justify-content: center;
     }
-    .text-primary {
+
+    .btn-lg {
+        padding: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .mt-2 {
+        margin-top: 0.5rem;
+    }
+
+    .auth-footer {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .link-primary {
         color: var(--primary);
+        font-weight: 500;
+        margin-left: 0.25rem;
+    }
+    .link-primary:hover {
+        text-decoration: underline;
     }
 </style>

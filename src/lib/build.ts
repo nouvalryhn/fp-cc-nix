@@ -8,16 +8,22 @@ const WORK_DIR = path.resolve(process.cwd(), "temp_builds");
 export async function buildImage(
   repoUrl: string,
   appName: string,
+  onLog?: (msg: string) => void
 ): Promise<string> {
   const buildId = Date.now().toString();
   const repoDir = path.join(WORK_DIR, appName, buildId);
   await fs.ensureDir(repoDir);
 
-  console.log(`[${appName}] Cloning ${repoUrl}...`);
+  const log = (msg: string) => {
+    console.log(msg.trim());
+    if (onLog) onLog(msg);
+  }
+
+  log(`[${appName}] Cloning ${repoUrl}...`);
   await simpleGit().clone(repoUrl, repoDir);
 
   const imageName = `${appName}:latest`;
-  console.log(`[${appName}] Building image ${imageName} using Nixpacks...`);
+  log(`[${appName}] Building image ${imageName} using Nixpacks...`);
 
   return new Promise((resolve, reject) => {
     const args = [
@@ -39,29 +45,25 @@ export async function buildImage(
       imageName,
     ];
 
-    console.log(`Running: docker ${args.join(" ")}`);
+    log(`Running: docker ${args.join(" ")}`);
 
     const child = spawn("docker", args, { env: process.env, shell: true });
 
-    child.stdout.on("data", (data) => process.stdout.write(`[build] ${data}`));
-    child.stderr.on("data", (data) =>
-      process.stderr.write(`[build-err] ${data}`),
-    );
+    child.stdout.on("data", (data) => log(`[build] ${data}`));
+    child.stderr.on("data", (data) => log(`[build-err] ${data}`));
 
     child.on("close", (code) => {
       if (code === 0) {
-        console.log(`[${appName}] Build success!`);
+        log(`[${appName}] Build success!`);
         resolve(imageName);
       } else {
-        console.error(`[${appName}] Build failed with code ${code}`);
+        log(`[${appName}] Build failed with code ${code}`);
         reject(new Error(`Build failed with exit code ${code}`));
       }
     });
 
     child.on("error", (err) => {
-      console.error(
-        `[${appName}] Failed to start build process: ${err.message}`,
-      );
+      log(`[${appName}] Failed to start build process: ${err.message}`);
       reject(err);
     });
   });

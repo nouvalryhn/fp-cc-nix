@@ -50,6 +50,33 @@ const DeploySchema = z.object({
   maxRetries: z.number().optional(),
 });
 
+
+
+// Event Emitter for build logs
+import { EventEmitter } from 'events';
+const buildEvents = new EventEmitter();
+
+fastify.get('/events/build/:buildId', async (request, reply) => {
+  const { buildId } = request.params as { buildId: string };
+
+  reply.raw.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  });
+
+  const listener = (msg: string) => {
+    reply.raw.write(`data: ${JSON.stringify({ log: msg })}\n\n`);
+  };
+
+  buildEvents.on(buildId, listener);
+
+  request.raw.on('close', () => {
+    buildEvents.off(buildId, listener);
+  });
+});
+
 fastify.post(
   "/deploy",
   { preHandler: [fastify.authenticate] },
@@ -61,29 +88,47 @@ fastify.post(
       }
 
       const { repoUrl, name, env, restartPolicy, maxRetries } = body.data;
-
       const userId = request.user.id;
 
       const existing = await prisma.app.findUnique({ where: { name } });
       if (existing)
         return reply.status(400).send({ error: "App name already taken" });
 
-      fastify.log.info(`Received deploy request for ${name} from ${repoUrl}`);
+      const buildId = Date.now().toString();
 
-      const imageName = await buildImage(repoUrl, name);
-      await deployApp(name, imageName, env || {}, restartPolicy, maxRetries);
+      // Start build in background
+      (async () => {
+        try {
+          const onLog = (msg: string) => buildEvents.emit(buildId, msg);
 
-      const app = await prisma.app.create({
-        data: {
-          name,
-          repoUrl,
-          userId,
-          domain: `${name}.localhost`,
-          status: "running",
-        },
-      });
+          fastify.log.info(`[${name}] Starting background build ${buildId}`);
+          onLog(`Starting deployment for ${name}...`);
 
-      return { status: "success", app };
+          const imageName = await buildImage(repoUrl, name, onLog);
+
+          onLog(`Deploying container...`);
+          await deployApp(name, imageName, env || {}, restartPolicy, maxRetries);
+
+          await prisma.app.create({
+            data: {
+              name,
+              repoUrl,
+              userId,
+              domain: `${name}.localhost`,
+              status: "running",
+            },
+          });
+
+          onLog(`Deployment successful!`);
+          buildEvents.emit(buildId, 'DONE'); // Signal completion
+        } catch (e: any) {
+          fastify.log.error(e);
+          buildEvents.emit(buildId, `ERROR: ${e.message}`);
+        }
+      })();
+
+      return { status: "pending", buildId };
+
     } catch (err: any) {
       request.log.error(err);
       return reply.code(500).send({ status: "error", message: err.message });
@@ -240,10 +285,108 @@ fastify.get(
   },
 );
 
+
+fastify.post(
+  "/apps/:id/redeploy",
+  { preHandler: [fastify.authenticate] },
+  async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const app = await prisma.app.findUnique({ where: { id } });
+
+    if (!app) return reply.code(404).send({ error: "App not found" });
+
+    if (app.userId !== request.user.id && request.user.role !== "ADMIN") {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    const buildId = Date.now().toString();
+
+    // Background Redeploy
+    (async () => {
+      try {
+        const onLog = (msg: string) => buildEvents.emit(buildId, msg);
+        onLog(`Starting redeploy for ${app.name}...`);
+
+        // 1. Capture config
+        let env: Record<string, string> = {};
+        let restartPolicy = "no";
+        let maxRetries = undefined;
+
+        try {
+          const container = docker.getContainer(app.name);
+          const info = await container.inspect();
+          info.Config.Env.forEach((e) => {
+            const parts = e.split("=");
+            const k = parts[0];
+            const v = parts.slice(1).join("=");
+            env[k] = v;
+          });
+          if (info.HostConfig?.RestartPolicy) {
+            restartPolicy = info.HostConfig.RestartPolicy.Name;
+            maxRetries = info.HostConfig.RestartPolicy.MaximumRetryCount;
+          }
+        } catch (e) {
+          onLog(`Warning: Could not inspect container config.`);
+        }
+
+        // 2. Rebuild
+        const imageName = await buildImage(app.repoUrl, app.name, onLog);
+
+        // 3. Redeploy
+        onLog(`Replacing container...`);
+        await deployApp(app.name, imageName, env, restartPolicy, maxRetries);
+
+        await prisma.app.update({
+          where: { id },
+          data: { status: 'running' }
+        });
+
+        onLog(`Redeployment successful!`);
+        buildEvents.emit(buildId, 'DONE');
+
+      } catch (err: any) {
+        fastify.log.error(err);
+        buildEvents.emit(buildId, `ERROR: ${err.message}`);
+      }
+    })();
+
+    return { status: "pending", buildId, message: "Redeploy started" };
+  },
+);
+
+const syncContainerStatus = async () => {
+  try {
+    const apps = await prisma.app.findMany();
+    const containers = await docker.listContainers({ all: true });
+
+    for (const app of apps) {
+      const container = containers.find((c) => c.Names.some((n) => n === `/${app.name}`));
+      const isRunning = container && container.State === 'running';
+      const dbStatus = app.status === 'running';
+
+      if (isRunning && !dbStatus) {
+        console.log(`[Sync] Marking ${app.name} as running`);
+        await prisma.app.update({ where: { id: app.id }, data: { status: 'running' } });
+      } else if (!isRunning && dbStatus) {
+        console.log(`[Sync] Marking ${app.name} as stopped`);
+        await prisma.app.update({ where: { id: app.id }, data: { status: 'stopped' } });
+      }
+    }
+  } catch (e) {
+    console.error("Error syncing container status:", e);
+  }
+};
+
 const start = async () => {
   try {
     await fastify.listen({ port: 3000, host: "0.0.0.0" });
     console.log("Server listening on http://localhost:3000");
+
+    // Initial sync
+    syncContainerStatus();
+    // Periodic sync every 10 seconds
+    setInterval(syncContainerStatus, 10000);
+
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

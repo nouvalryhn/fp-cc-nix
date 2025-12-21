@@ -1,71 +1,107 @@
 <script lang="ts">
-import "../app.css";
-import { auth, logout } from "../stores/auth";
+  import "../app.css";
+  import { auth, logout } from "../stores/auth";
 
-let isAuthenticated = false;
-let isAdmin = false;
+  let isAuthenticated = false;
+  let isAdmin = false;
 
-auth.subscribe((val) => {
-  isAuthenticated = val.isAuthenticated;
-  isAdmin = val.user?.role === "ADMIN";
-});
+  auth.subscribe((val) => {
+    isAuthenticated = val.isAuthenticated;
+    isAdmin = val.user?.role === "ADMIN";
+  });
 </script>
 
-<nav class="border-b bg-white">
-  <div
-    class="container py-4 flex justify-between items-center"
-    style="padding-top: 1rem; padding-bottom: 1rem;"
-  >
-    <a
-      href="/"
-      class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600"
-      style="background: linear-gradient(to right, #2563eb, #4f46e5); -webkit-background-clip: text; color: transparent;"
-    >
-      PaaS Dashboard
+<nav class="navbar">
+  <div class="nav-content">
+    <a href="/" class="brand">
+      <span class="logo-icon">⚡</span>
+      AmbatuPaaS
     </a>
 
-    <div class="flex items-center gap-4">
+    <div class="nav-links">
       {#if isAuthenticated}
         {#if isAdmin}
-          <a href="/admin" class="btn">Superadmin</a>
+          <a href="/admin" class="nav-item">Admin</a>
         {/if}
-        <a href="/deploy" class="btn btn-primary"> + New Deployment </a>
-        <button on:click={logout} class="btn">Logout</button>
+        <button on:click={logout} class="nav-item">Logout</button>
+        <a href="/deploy" class="btn btn-primary">
+          <span>+</span> New Deployment
+        </a>
       {:else}
-        <a href="/login" class="btn">Login</a>
-        <a href="/register" class="btn btn-primary">Register</a>
+        <a href="/login" class="nav-item">Login</a>
+        <a href="/register" class="btn btn-primary">Get Started</a>
       {/if}
     </div>
   </div>
 </nav>
 
-<main class="container">
+<main class="main-content">
   <slot />
 </main>
 
 <style>
-  .border-b {
-    border-bottom: 1px solid var(--border);
-  }
-  .bg-white {
-    background: white;
-  }
-  .flex {
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-backdrop);
+    border-bottom: 1px solid var(--glass-border);
+    z-index: 100;
     display: flex;
-  }
-  .justify-between {
-    justify-content: space-between;
-  }
-  .items-center {
     align-items: center;
   }
-  .text-xl {
+
+  .nav-content {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand {
     font-size: 1.25rem;
-  }
-  .font-bold {
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
-  .gap-4 {
-    gap: 1rem;
+
+  .logo-icon {
+    font-size: 1.5rem;
+    -webkit-text-fill-color: initial;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .nav-item {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.2s;
+    background: none;
+    padding: 0;
+  }
+
+  .nav-item:hover {
+    color: var(--text-main);
+  }
+
+  .main-content {
+    margin-top: 70px;
+    min-height: calc(100vh - 70px);
+    padding: 2rem;
   }
 </style>
