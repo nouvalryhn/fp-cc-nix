@@ -13,13 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Create .env bak file
+      - name: Create .env file (BOM-less)
+        shell: powershell
         run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env.bak
-          
-      - name: Convert .env encoding to utf-8
-        run: |
-          Get-Content .env.bak | Set-Content -Encoding utf8 .env
+          # Using ASCII encoding prevents the \ufeff (BOM) and \xff\xfe (UTF-16) errors
+          "DATABASE_URL=${{ secrets.DATABASE_URL }}" | Out-File -FilePath .env -Encoding ASCII
       
       - name: Deploy with Docker Compose
         run: docker compose -f docker-compose.prod.yml up -d --build
