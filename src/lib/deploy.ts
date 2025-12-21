@@ -1,9 +1,18 @@
 import docker from "./docker";
 
+enum RestartPolicy {
+  NO = "no",
+  ON_FAILURE = "on-failure",
+  ALWAYS = "always",
+  UNLESS_STOPPED = "unless-stopped",
+}
+
 export async function deployApp(
   appName: string,
   imageName: string,
   env: Record<string, string> = {},
+  policy: string = RestartPolicy.NO,
+  maxRetries?: number,
 ) {
   const containers = await docker.listContainers({ all: true });
   const existing = containers.find((c) => c.Names.includes(`/${appName}`));
@@ -38,6 +47,12 @@ export async function deployApp(
         [`traefik.http.services.${appName}.loadbalancer.server.port`]: "3000",
       },
       HostConfig: {
+        RestartPolicy: {
+          Name: policy,
+          ...(policy === RestartPolicy.ON_FAILURE && {
+            MaximumRetryCount: maxRetries,
+          }),
+        },
         NetworkMode: "paas-network",
       },
     })

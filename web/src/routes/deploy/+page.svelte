@@ -1,83 +1,94 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { auth } from "../../stores/auth";
-  import { goto } from "$app/navigation";
+import { onMount } from "svelte";
+import { auth } from "../../stores/auth";
+import { goto } from "$app/navigation";
 
-  let repoUrl = "";
-  let name = "";
-  let loading = false;
-  let error: string | null = null;
-  let logs: string[] = [];
-  let token: string | null = null;
-  
-  let envVars: Array<{ key: string; value: string }> = [{ key: "", value: "" }];
+let repoUrl = "";
+let name = "";
+let loading = false;
+let error: string | null = null;
+let logs: string[] = [];
+let token: string | null = null;
+let restartPolicy = "no";
+let maxRetries: number | null;
 
-  onMount(() => {
-    const unsub = auth.subscribe((val) => {
-      if (!val.isAuthenticated) {
-        goto("/login");
-      } else {
-        token = val.token;
-      }
-    });
-    return unsub;
-  });
+let envVars: Array<{ key: string; value: string }> = [{ key: "", value: "" }];
 
-  function addEnvVar() {
-    envVars = [...envVars, { key: "", value: "" }];
-  }
-
-  function removeEnvVar(index: number) {
-    envVars = envVars.filter((_, i) => i !== index);
-  }
-
-  async function handleSubmit() {
-    if (!repoUrl || !name) return;
-    if (!token) {
-      error = "You must be logged in to deploy.";
-      return;
+onMount(() => {
+  const unsub = auth.subscribe((val) => {
+    if (!val.isAuthenticated) {
+      goto("/login");
+    } else {
+      token = val.token;
     }
+  });
+  return unsub;
+});
 
-    loading = true;
-    error = null;
-    logs = ["Starting deployment... this may take a minute..."];
+function addEnvVar() {
+  envVars = [...envVars, { key: "", value: "" }];
+}
 
-    try {
-      const env = envVars.reduce((acc, { key, value }) => {
+function removeEnvVar(index: number) {
+  envVars = envVars.filter((_, i) => i !== index);
+}
+
+async function handleSubmit() {
+  if (!repoUrl || !name) return;
+  if (!token) {
+    error = "You must be logged in to deploy.";
+    return;
+  }
+
+  loading = true;
+  error = null;
+  logs = ["Starting deployment... this may take a minute..."];
+
+  try {
+    const env = envVars.reduce(
+      (acc, { key, value }) => {
         if (key.trim()) {
           acc[key.trim()] = value;
         }
         return acc;
-      }, {} as Record<string, string>);
+      },
+      {} as Record<string, string>,
+    );
 
-      const res = await fetch("http://localhost:3000/deploy", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ repoUrl, name, env }),
-      });
+    const res = await fetch("http://localhost:3000/deploy", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        repoUrl,
+        name,
+        env,
+        restartPolicy,
+        maxRetries,
+      }),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.message || data.error || "Deployment failed");
-      }
-
-      logs = [
-        ...logs,
-        "Deployment successful!",
-        `URL: ${data.url || data.app.domain || ""}`,
-      ];
-      setTimeout(() => goto("/"), 1500);
-    } catch (e: any) {
-      error = e.message;
-      logs = [...logs, `Error: ${e.message}`];
-    } finally {
-      loading = false;
+    if (!res.ok) {
+      throw new Error(data.message || data.error || "Deployment failed");
     }
+
+    logs = [
+      ...logs,
+      "Deployment successful!",
+      `URL: ${data.url || data.app.domain || ""}`,
+    ];
+    setTimeout(() => goto("/"), 1500);
+  } catch (e: any) {
+    error = e.message;
+    logs = [...logs, `Error: ${e.message}`];
+  } finally {
+    loading = false;
   }
+}
 </script>
 
 <div class="max-w-2xl mx-auto">
@@ -120,6 +131,27 @@
           required
         />
       </div>
+
+      <div>
+        <label for="restart-policy" class="label">Restart Policy</label>
+        <select bind:value={restartPolicy} class="input">
+          <option value="no">no</option>
+          <option value="on-failure">on-failure</option>
+          <option value="always">always</option>
+          <option value="unless-stopped">unless-stopped</option>
+        </select>
+      </div>
+
+      {#if restartPolicy === 'on-failure'}
+      <label for="max-retries" class="label">Max Retries</label>
+      <input 
+          type="number" 
+          id="max-retries" 
+          bind:value={maxRetries} 
+          min="1" 
+          class="input" 
+      />
+      {/if}
 
       <div>
         <div class="flex justify-between items-center mb-2">

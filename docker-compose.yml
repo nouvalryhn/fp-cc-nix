@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   traefik:
     image: traefik:v2.10
@@ -15,9 +13,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - paas-network
-
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     restart: always
     environment:
       POSTGRES_USER: admin
@@ -29,11 +26,8 @@ services:
       - pgdata:/var/lib/postgresql/data
     networks:
       - paas-network
-
 volumes:
   pgdata:
-
-
 networks:
   paas-network:
     external: true

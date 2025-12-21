@@ -46,6 +46,8 @@ const DeploySchema = z.object({
   repoUrl: z.url({ message: "Invalid URL" }),
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
   env: z.record(z.string(), z.string()).optional(),
+  restartPolicy: z.string().optional(),
+  maxRetries: z.number().optional(),
 });
 
 fastify.post(
@@ -58,7 +60,8 @@ fastify.post(
         return reply.status(404).send({ error: body.error.issues[0].message });
       }
 
-      const { repoUrl, name, env } = body.data;
+      const { repoUrl, name, env, restartPolicy, maxRetries } = body.data;
+
       const userId = request.user.id;
 
       const existing = await prisma.app.findUnique({ where: { name } });
@@ -68,7 +71,7 @@ fastify.post(
       fastify.log.info(`Received deploy request for ${name} from ${repoUrl}`);
 
       const imageName = await buildImage(repoUrl, name);
-      await deployApp(name, imageName, env || {});
+      await deployApp(name, imageName, env || {}, restartPolicy, maxRetries);
 
       const app = await prisma.app.create({
         data: {
