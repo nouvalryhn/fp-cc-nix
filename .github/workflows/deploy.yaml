@@ -16,6 +16,9 @@ jobs:
       - name: Create .env file
         run: |
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+          
+      - name: Convert .env encoding to utf-8
+        run: |
           Get-Content .env | Set-Content -Encoding utf8 .env
       
       - name: Deploy with Docker Compose
