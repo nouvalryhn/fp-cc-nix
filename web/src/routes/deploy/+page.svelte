@@ -9,6 +9,8 @@
   let error: string | null = null;
   let logs: string[] = [];
   let token: string | null = null;
+  
+  let envVars: Array<{ key: string; value: string }> = [{ key: "", value: "" }];
 
   onMount(() => {
     const unsub = auth.subscribe((val) => {
@@ -20,6 +22,14 @@
     });
     return unsub;
   });
+
+  function addEnvVar() {
+    envVars = [...envVars, { key: "", value: "" }];
+  }
+
+  function removeEnvVar(index: number) {
+    envVars = envVars.filter((_, i) => i !== index);
+  }
 
   async function handleSubmit() {
     if (!repoUrl || !name) return;
@@ -33,13 +43,20 @@
     logs = ["Starting deployment... this may take a minute..."];
 
     try {
+      const env = envVars.reduce((acc, { key, value }) => {
+        if (key.trim()) {
+          acc[key.trim()] = value;
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
       const res = await fetch("http://localhost:3000/deploy", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ repoUrl, name }),
+        body: JSON.stringify({ repoUrl, name, env }),
       });
 
       const data = await res.json();
@@ -53,7 +70,7 @@
         "Deployment successful!",
         `URL: ${data.url || data.app.domain || ""}`,
       ];
-      setTimeout(() => goto("/"), 1500); // Redirect back to dashboard
+      setTimeout(() => goto("/"), 1500);
     } catch (e: any) {
       error = e.message;
       logs = [...logs, `Error: ${e.message}`];
@@ -102,6 +119,53 @@
           disabled={loading}
           required
         />
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <label class="label mb-0">Environment Variables</label>
+          <button
+            type="button"
+            class="btn-small"
+            on:click={addEnvVar}
+            disabled={loading}
+          >
+            + Add Variable
+          </button>
+        </div>
+        <div class="env-vars-container">
+          {#each envVars as envVar, index}
+            <div class="env-var-row">
+              <input
+                type="text"
+                class="input env-key"
+                placeholder="KEY"
+                bind:value={envVar.key}
+                disabled={loading}
+              />
+              <input
+                type="text"
+                class="input env-value"
+                placeholder="value"
+                bind:value={envVar.value}
+                disabled={loading}
+              />
+              {#if envVars.length > 1}
+                <button
+                  type="button"
+                  class="btn-remove"
+                  on:click={() => removeEnvVar(index)}
+                  disabled={loading}
+                >
+                  ×
+                </button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+        <p class="text-xs text-muted mt-1">
+          Note: PORT and HOST are automatically set if not provided
+        </p>
       </div>
 
       {#if error}
@@ -189,5 +253,88 @@
   .font-mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       monospace;
+  }
+
+  .flex {
+    display: flex;
+  }
+  .justify-between {
+    justify-content: space-between;
+  }
+  .items-center {
+    align-items: center;
+  }
+  .mb-0 {
+    margin-bottom: 0;
+  }
+  .mb-2 {
+    margin-bottom: 0.5rem;
+  }
+  .mt-1 {
+    margin-top: 0.25rem;
+  }
+
+  .btn-small {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-small:hover:not(:disabled) {
+    background: var(--primary-hover);
+  }
+
+  .btn-small:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .env-vars-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .env-var-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 32px; 
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .env-key, .env-value {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .btn-remove {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-remove:hover:not(:disabled) {
+    opacity: 0.8;
+  }
+
+  .btn-remove:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>
