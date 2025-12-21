@@ -7,6 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
+# Install build deps
+RUN apk add --no-cache python3 make g++
+
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
 
@@ -27,6 +30,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
+
+# Install build deps
+RUN apk add --no-cache python3 make g++
 
 # Install production dependencies only
 RUN npm ci --only=production
