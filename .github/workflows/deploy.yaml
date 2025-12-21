@@ -13,13 +13,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Create .env file
+      - name: Create .env bak file
         run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env.bak
           
       - name: Convert .env encoding to utf-8
         run: |
-          Get-Content .env | Set-Content -Encoding utf8 .env
+          Get-Content .env.bak | Set-Content -Encoding utf8 .env
       
       - name: Deploy with Docker Compose
         run: docker compose -f docker-compose.prod.yml up -d --build
