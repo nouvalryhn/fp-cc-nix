@@ -8,7 +8,12 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install build deps
-RUN apk add --no-cache python3 make g++ git
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    docker-cli
 
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
@@ -32,7 +37,12 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install build deps
-RUN apk add --no-cache python3 make g++ git
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    docker-cli
 
 # Install production dependencies only
 RUN npm ci --only=production
