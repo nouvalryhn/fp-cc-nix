@@ -1,0 +1,52 @@
+services:
+  traefik:
+    image: traefik:v2.10
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - paas-network
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      - traefik
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    networks:
+      - paas-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - traefik
+      - api
+    environment:
+      PORT: 3000
+      INTERNAL_API_URL: http://api:3000
+    ports:
+      - "5173:3000"
+    networks:
+      - paas-network
+
+networks:
+  paas-network:
+    driver: bridge
