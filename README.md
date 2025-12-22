@@ -42,8 +42,8 @@ graph TD
         Proxy[Traefik Router]
         
         subgraph "Management & Orchestration"
-            API[API Server (Fastify)]
-            Auth[Auth Service (JWT)]
+            API[API Server Fastify]
+            Auth[Auth Service JWT]
             Builder[Nixpacks Build Service]
         end
         
