@@ -84,36 +84,7 @@ Monitoring dilakukan secara _proactive_ dan _granular_ per container.
 Untuk pengembangan platform PaaS ini sendiri, berikut adalah usulan pipeline CI/CD modern:
 
 ### Pipeline Flow
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Git as GitHub Repo
-    participant CI as CI Server (GitHub Actions)
-    participant Registry as Docker Registry
-    participant Prod as Production Server
-
-    Dev->>Git: Push Code
-    Git->>CI: Trigger Pipeline
-    
-    rect rgb(200, 255, 200)
-    Note over CI: Test Phase
-    CI->>CI: Run Unit Tests (Vitest)
-    CI->>CI: Run Linter (ESLint)
-    end
-    
-    rect rgb(200, 200, 255)
-    Note over CI: Build Phase
-    CI->>CI: Build Docker Image (PaaS Core)
-    CI->>Registry: Push Image (tag: latest)
-    end
-    
-    rect rgb(255, 200, 200)
-    Note over CI: Deploy Phase
-    CI->>Prod: SSH Remote Command
-    Prod->>Registry: Pull New Image
-    Prod->>Prod: Restart PaaS Core Service
-    end
-```
+<img width="1172" height="823" alt="image" src="https://github.com/user-attachments/assets/0d476ce6-7610-4cb2-9309-c44138ffc43b" />
 
 ### Komponen CI/CD
 1.  **Version Control**: GitHub (Branch Protection pada `main`).
