@@ -28,47 +28,8 @@ Sistem ini dirancang sebagai layanan **PaaS (Platform as a Service)** yang berja
 ## 2. Diagram Arsitektur Multi-tenancy
 
 Sistem mengadopsi model **Isolation-per-Container** di mana setiap aplikasi tenant berjalan di container terpisah, namun berbagi database dan infrastruktur yang sama (Shared Resource, Isolated Execution).
+<img width="1364" height="745" alt="image" src="https://github.com/user-attachments/assets/3139bd94-9dd3-43df-b952-d56701bcc27f" />
 
-```mermaid
-graph TD
-    subgraph "Cloud Consumer (Pengguna)"
-        User[Browser / Client]
-        Admin[Superadmin]
-    end
-
-    subgraph "Cloud Provider (SaaS/PaaS Layer)"
-        direction TB
-        
-        Proxy[Traefik Router]
-        
-        subgraph "Management & Orchestration"
-            API[API Server Fastify]
-            Auth[Auth Service JWT]
-            Builder[Nixpacks Build Service]
-        end
-        
-        subgraph "Shared Resources"
-            DB[(PostgreSQL Database)]
-        end
-
-        subgraph "Tenant Isolation (Docker Containers)"
-            App1[Tenant A - App 1]
-            App2[Tenant A - App 2]
-            App3[Tenant B - App 1]
-        end
-    end
-
-    User -->|HTTP/HTTPS| Proxy
-    Proxy -->|Domain Routing| App1
-    Proxy -->|Domain Routing| App2
-    Proxy -->|Domain Routing| API
-    
-    API -->|Manage| DockerSocket[Docker Engine API]
-    API -->|Query| DB
-    Builder -->|Build Image| DockerSocket
-    
-    API -->|Stream Logs| User
-```
 
 ### Manajemen Tenant
 -   **Logika Isolasi**: Middleware backend memfilter akses resource berdasarkan `userId` (Owner-based Access Control).
