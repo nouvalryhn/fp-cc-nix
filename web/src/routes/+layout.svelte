@@ -15,7 +15,7 @@
   <div class="nav-content">
     <a href="/" class="brand">
       <span class="logo-icon">⚡</span>
-      AmbatuPaaS
+      NixPaaS
     </a>
 
     <div class="nav-links">
