@@ -1,85 +1,199 @@
-# Minimalist PaaS
+# Dokumentasi Sistem PaaS (Platform as a Service)
 
-## Overview
-We have built a minimalist Platform-as-a-Service (PaaS) that runs on a single Linux server (simulated here on Windows). It uses **Docker** and **Nixpacks** to automatically build and deploy applications from Git repositories.
+Dokumentasi ini disusun berdasarkan kerangka kerja **NIST Cloud Computing Reference Architecture (CCRA)** untuk menjelaskan arsitektur, lingkungan, dan manajemen sistem PaaS yang telah dibangun.
 
-## Components
--   **Orchestrator**: Node.js API server (`src/server.ts`).
--   **Builder**: Uses `ghcr.io/railwayapp/nixpacks` to build container images.
--   **Router**: **Traefik** reverse proxy to route subdomains to containers.
+---
 
-## Setup
-1.  **Installation**:
+## 1. Rancangan Environment dan Konfigurasi
+
+Sistem ini dirancang sebagai layanan **PaaS (Platform as a Service)** yang berjalan di atas infrastruktur hybrid (Windows/Linux) dengan containerization sebagai fondasi utama.
+
+### Pilihan Produk & Teknologi
+| Komponen NIST | Teknologi / Produk | Alasan Pemilihan |
+|---|---|---|
+| **Physical Layer** | Windows (Dev) / Linux (Prod) | Lingkungan pengembangan lokal yang fleksibel, siap untuk deployment produksi di Linux. |
+| **Resource Abstraction** | **Docker Engine** | Standar industri untuk isolasi aplikasi dan manajemen resource yang efisien. |
+| **Service Orchestration** | **Node.js (Fastify)** | Framework backend yang cepat (low overhead) dan asinkronus untuk menangani request concurrent. |
+| **Data Storage** | **PostgreSQL (via Prisma)** | Database relasional yang kuat untuk data tenant, user, dan metadata aplikasi. |
+| **Build System** | **Nixpacks** | Engine build otomatis yang mendeteksi bahasa pemrograman tanpa Dockerfile manual. |
+| **Ingress/Routing** | **Traefik** | Reverse proxy cloud-native yang otomatis mendeteksi dan merutekan container baru. |
+
+### Konfigurasi
+-   **Network**: docker network `paas-network` untuk isolasi traffic internal.
+-   **Storage**: Volume docker persisten untuk PostgreSQL.
+-   **Security**: JWT (JSON Web Token) untuk autentikasi stateless antar servis.
+
+---
+
+## 2. Diagram Arsitektur Multi-tenancy
+
+Sistem mengadopsi model **Isolation-per-Container** di mana setiap aplikasi tenant berjalan di container terpisah, namun berbagi database dan infrastruktur yang sama (Shared Resource, Isolated Execution).
+
+```mermaid
+graph TD
+    subgraph "Cloud Consumer (Pengguna)"
+        User[Browser / Client]
+        Admin[Superadmin]
+    end
+
+    subgraph "Cloud Provider (SaaS/PaaS Layer)"
+        direction TB
+        
+        Proxy[Traefik Router]
+        
+        subgraph "Management & Orchestration"
+            API[API Server (Fastify)]
+            Auth[Auth Service (JWT)]
+            Builder[Nixpacks Build Service]
+        end
+        
+        subgraph "Shared Resources"
+            DB[(PostgreSQL Database)]
+        end
+
+        subgraph "Tenant Isolation (Docker Containers)"
+            App1[Tenant A - App 1]
+            App2[Tenant A - App 2]
+            App3[Tenant B - App 1]
+        end
+    end
+
+    User -->|HTTP/HTTPS| Proxy
+    Proxy -->|Domain Routing| App1
+    Proxy -->|Domain Routing| App2
+    Proxy -->|Domain Routing| API
+    
+    API -->|Manage| DockerSocket[Docker Engine API]
+    API -->|Query| DB
+    Builder -->|Build Image| DockerSocket
+    
+    API -->|Stream Logs| User
+```
+
+### Manajemen Tenant
+-   **Logika Isolasi**: Middleware backend memfilter akses resource berdasarkan `userId` (Owner-based Access Control).
+-   **Aplikasi Manajemen**: Dashboard Admin (SvelteKit) memungkinkan Superadmin melihat, menghentikan, atau menghapus aplikasi lintas tenant.
+
+---
+
+## 3. Resource Abstraction & Provisioning
+
+Bagian ini menjelaskan bagaimana sistem menyembunyikan kompleksitas infrastruktur fisik dari pengguna.
+
+### Resource Abstraction
+Pengguna tidak perlu mengetahui OS host atau manajemen kernel.
+-   **Compute**: Diabstraksi menjadi "Container" dengan batasan CPU/RAM (via Docker Stats).
+-   **Network**: Diabstraksi menjadi "Subdomain" (`app.domain.com`) tanpa konfigurasi IP manual.
+
+### Provisioning Workflow
+Proses provisioning berjalan otomatis (Automated Service Provisioning):
+1.  **Request**: User mengirim URL Git.
+2.  **Abstraksi Build**: `Nixpacks` menganalisis kode -> menentukan runtime -> membuat OCI Image.
+3.  **Deployment**: Orchestrator membuat container baru dengan environment variables yang dikonfigurasi.
+4.  **Routing**: Traefik mendeteksi container baru dan mendaftarkan route secara instan.
+
+### Business Support Layer
+-   **Billing/Metering** (Future): API `/metrics` sudah tersedia untuk menghitung penggunaan CPU/RAM per container sebagai dasar penagihan.
+-   **Reporting**: Dashboard menyediakan visualisasi status real-time.
+
+---
+
+## 4. Rancangan Monitoring
+
+Monitoring dilakukan secara _proactive_ dan _granular_ per container.
+
+### Mekanisme Monitoring
+1.  **Container Metrics**:
+    -   API Endpoint: `/apps/:id/metrics` memanfaatkan `docker stats` API.
+    -   Metrik: CPU Usage (%), Memory Usage (MB/%), Network I/O.
+    -   Visualisasi: Ditampilkan pada Dashboard Pengguna secara real-time.
+
+2.  **Log Streaming (Observability)**:
+    -   Menggunakan **Server-Sent Events (SSE)** untuk streaming log build dan runtime secara real-time dari server ke browser.
+    -   Memungkinkan pengguna mendebug kegagalan deployment seketika.
+
+3.  **Health Check (Background Job)**:
+    -   Job `syncContainerStatus` berjalan setiap 10 detik.
+    -   Fungsi: Menyelaraskan status database dengan status aktual container Docker (Self-Healing state reflection).
+
+---
+
+## 5. Rancangan CI/CD (Proposed)
+
+Untuk pengembangan platform PaaS ini sendiri, berikut adalah usulan pipeline CI/CD modern:
+
+### Pipeline Flow
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Git as GitHub Repo
+    participant CI as CI Server (GitHub Actions)
+    participant Registry as Docker Registry
+    participant Prod as Production Server
+
+    Dev->>Git: Push Code
+    Git->>CI: Trigger Pipeline
+    
+    rect rgb(200, 255, 200)
+    Note over CI: Test Phase
+    CI->>CI: Run Unit Tests (Vitest)
+    CI->>CI: Run Linter (ESLint)
+    end
+    
+    rect rgb(200, 200, 255)
+    Note over CI: Build Phase
+    CI->>CI: Build Docker Image (PaaS Core)
+    CI->>Registry: Push Image (tag: latest)
+    end
+    
+    rect rgb(255, 200, 200)
+    Note over CI: Deploy Phase
+    CI->>Prod: SSH Remote Command
+    Prod->>Registry: Pull New Image
+    Prod->>Prod: Restart PaaS Core Service
+    end
+```
+
+### Komponen CI/CD
+1.  **Version Control**: GitHub (Branch Protection pada `main`).
+2.  **Continuous Integration**:
+    -   Automated Testing pada setiap Pull Request.
+    -   Static Code Analysis untuk menjaga kualitas kode TypeScript.
+3.  **Continuous Deployment**:
+    -   **Rollback Strategy**: Menyimpan `tag` image sebelumnya untuk pemulihan cepat jika `latest` bermasalah.
+
+---
+
+## 6. Lampiran: Panduan Instalasi Teknis
+
+Petunjuk singkat untuk menjalankan PaaS ini di lingkungan lokal (Dev).
+
+### Persyaratan
+- Node.js & npm
+- Docker Desktop (Status: Running)
+
+### Instalasi & Jalankan
+1.  **Install Dependensi**:
     ```bash
     npm install
+    cd web && npm install && cd ..
     ```
-2.  **Build Builder Image**:
+2.  **Setup Database**:
     ```bash
-    docker build -t local-nixpacks-builder builder/
-    ```
-3.  **Infrastructure**:
-    Start Traefik (proxy) and PostgreSQL (database):
-    ```bash
-    docker network create paas-network
+    # Menjalankan PostgreSQL & Traefik
     docker-compose up -d
-    ```
-4.  **Database Setup**:
-    Run Prisma migrations to initialize the schema:
-    ```bash
+    
+    # Migrasi Schema Database
     npx prisma migrate dev
     ```
+3.  **Jalankan Aplikasi**:
+    ```bash
+    # Terminal 1 (Backend - Port 3000)
+    npm run dev
 
-## Usage
+    # Terminal 2 (Frontend - Port 5173)
+    cd web
+    npm run dev
+    ```
 
-### 1. Start the Server
-```bash
-npm run dev
-```
-*Server runs on port 3000.*
-
-### 2. Start the Frontend (Dashboard)
-```bash
-cd web
-npm run dev
-```
-*Dashboard runs on port 5173.*
-
-### 3. Deploy an App
-You can use the dashboard at `http://localhost:5173` or the API directly:
-```bash
-curl -X POST http://localhost:3000/deploy \
-  -H "Content-Type: application/json" \
-  -d '{"repoUrl":"https://github.com/railwayapp-templates/node-express", "name":"my-app"}'
-```
-
-### 4. Access
-The app is accessible via Traefik:
-```bash
-curl -H "Host: my-app.localhost" http://localhost
-```
-
-## Features Verified
-### Routing
-- **Status**: Success
-- **Test**: `curl -H "Host: simple-app.localhost" http://localhost`
-- **Result**: `Hello from PaaS!`
-- **Note**: Deployment logic enforces `PORT=3000` to match Traefik configuration.
-
-### Frontend (SvelteKit)
-- **Status**: Success
-- **URL**: `http://localhost:5173`
-- **Features**:
-    -   **Dashboard**: Lists running apps with status.
-    -   **Deploy**: Form to deploy new apps from Git URLs.
--   **Verification**: Verified page load and API connectivity.
-
-## V2 Features (Auth & DB)
--   **Database**: PostgreSQL (Prisma ORM)
--   **Auth**: JWT-based Email/Password
--   **Roles**: User and Superadmin
-
-### Verified Stacks
--   **Node.js**: `railwayapp-templates/node-express` (Port 3000)
--   **Go**: `railwayapp-templates/gin` (Port 3000)
-    -   *Note*: Nixpacks automatically detected Go and built the binary.
--   **Next.js**: `railwayapp-templates/nextjs-basic` (Port 3000)
+Akses Dashboard di `http://localhost:5173`.
