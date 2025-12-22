@@ -79,20 +79,12 @@ Monitoring dilakukan secara _proactive_ dan _granular_ per container.
 
 ---
 
-## 5. Rancangan CI/CD (Proposed)
+## 5. Rancangan CI/CD
 
-Untuk pengembangan platform PaaS ini sendiri, berikut adalah usulan pipeline CI/CD modern:
+Untuk aplikasi yang di-deploy di platform PaaS ini sendiri, berikut adalah pipeline CI/CD yang digunakan:
 
 ### Pipeline Flow
 <img width="1172" height="823" alt="image" src="https://github.com/user-attachments/assets/0d476ce6-7610-4cb2-9309-c44138ffc43b" />
-
-### Komponen CI/CD
-1.  **Version Control**: GitHub (Branch Protection pada `main`).
-2.  **Continuous Integration**:
-    -   Automated Testing pada setiap Pull Request.
-    -   Static Code Analysis untuk menjaga kualitas kode TypeScript.
-3.  **Continuous Deployment**:
-    -   **Rollback Strategy**: Menyimpan `tag` image sebelumnya untuk pemulihan cepat jika `latest` bermasalah.
 
 ---
 
